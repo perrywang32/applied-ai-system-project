@@ -1,6 +1,6 @@
 import csv
 from typing import List, Dict, Tuple, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 from src.validation import (
     DatasetValidationError,
@@ -44,13 +44,35 @@ class Recommender:
     def __init__(self, songs: List[Song]):
         self.songs = songs
 
+    @staticmethod
+    def _profile_to_prefs(user: UserProfile) -> Dict:
+        """Convert a UserProfile dataclass into the prefs dict the scorer uses."""
+        return {
+            "genre": user.favorite_genre,
+            "mood": user.favorite_mood,
+            "target_energy": user.target_energy,
+            "likes_acoustic": user.likes_acoustic,
+        }
+
     def recommend(self, user: UserProfile, k: int = 5) -> List[Song]:
-        # TODO: Implement recommendation logic
-        return self.songs[:k]
+        """Rank the songs for this user by delegating to the functional scorer.
+
+        This reuses recommend_songs()/score_song() rather than reimplementing the
+        logic, so the OOP and functional APIs always agree. Songs are converted
+        to dicts for scoring and mapped back to the original Song objects by id.
+        """
+        prefs = self._profile_to_prefs(user)
+        by_id = {song.id: song for song in self.songs}
+        song_dicts = [asdict(song) for song in self.songs]
+
+        ranked = recommend_songs(prefs, song_dicts, k=k)
+        return [by_id[song_dict["id"]] for song_dict, _score, _reasons in ranked]
 
     def explain_recommendation(self, user: UserProfile, song: Song) -> str:
-        # TODO: Implement explanation logic
-        return "Explanation placeholder"
+        """Return the human-readable reasons this song scored as it did."""
+        prefs = self._profile_to_prefs(user)
+        _score, reasons = score_song(prefs, asdict(song))
+        return "\n".join(reasons)
 
 def load_songs(csv_path: str) -> List[Dict]:
     """Read the songs CSV and return a list of dicts, with number columns as floats.
