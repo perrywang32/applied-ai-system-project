@@ -1,0 +1,5 @@
+# Keep the logs/ folder in version control but ignore generated log files.
+# The reliability layer's logging (see IMPLEMENTATION_PLAN.md, Step 6) will
+# write runtime logs here; those should not be committed.
+*.log
+!.gitignore

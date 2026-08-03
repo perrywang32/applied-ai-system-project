@@ -2,6 +2,12 @@ import csv
 from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass
 
+from src.validation import (
+    DatasetValidationError,
+    NUMERIC_SONG_FIELDS,
+    validate_columns,
+)
+
 @dataclass
 class Song:
     """
@@ -47,27 +53,44 @@ class Recommender:
         return "Explanation placeholder"
 
 def load_songs(csv_path: str) -> List[Dict]:
-    """Read the songs CSV and return a list of dicts, with number columns as floats."""
+    """Read the songs CSV and return a list of dicts, with number columns as floats.
+
+    Validates the header columns and the numeric values as it parses. A missing
+    column or a malformed/missing number raises a friendly DatasetValidationError
+    (with the offending row and column) instead of a raw ValueError.
+    """
     # Columns that hold measurements and should be parsed as floats.
     # Everything else (title, artist, genre, mood) stays a string.
-    float_fields = {"energy", "tempo_bpm", "valence", "danceability", "acousticness"}
+    float_fields = NUMERIC_SONG_FIELDS
 
     songs: List[Dict] = []
     with open(csv_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)  # uses the header row for dict keys
-        for row in reader:
+        validate_columns(reader.fieldnames)  # fail early if a column is missing
+        # Row 1 is the header, so data rows start at line 2.
+        for line_no, row in enumerate(reader, start=2):
             song: Dict = {}
             for key, value in row.items():
                 if key == "id":
-                    song[key] = int(value)          # id is a whole-number identifier
+                    song[key] = _parse_number(value, key, line_no, as_int=True)
                 elif key in float_fields:
-                    song[key] = float(value)        # numeric feature -> float
+                    song[key] = _parse_number(value, key, line_no, as_int=False)
                 else:
                     song[key] = value               # categorical -> keep as string
             songs.append(song)
 
     print(f"Loaded {len(songs)} songs from {csv_path}")
     return songs
+
+
+def _parse_number(value, column: str, line_no: int, as_int: bool):
+    """Parse a CSV cell as a number, raising a friendly DatasetValidationError on failure."""
+    try:
+        return int(value) if as_int else float(value)
+    except (TypeError, ValueError):
+        raise DatasetValidationError(
+            f"Row {line_no}, column '{column}' has a malformed or missing number: {value!r}."
+        )
 
 def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
     """Score one song against the user's preferences and return (score, reasons)."""

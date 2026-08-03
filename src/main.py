@@ -9,7 +9,16 @@ You will implement the functions in recommender.py:
 - recommend_songs
 """
 
+import sys
+
+from src.conflicts import detect_conflicts
 from src.recommender import load_songs, recommend_songs
+from src.validation import (
+    ValidationError,
+    validate_dataset,
+    validate_top_k,
+    validate_user_prefs,
+)
 
 # Width of the divider lines. Kept as a constant so the layout is easy to tweak.
 WIDTH = 60
@@ -43,14 +52,45 @@ def print_recommendations(user_prefs: dict, recommendations: list) -> None:
         print("-" * WIDTH)
 
 
+def print_conflicts(conflicts: list) -> None:
+    """Print any profile-conflict warnings above the recommendations."""
+    if not conflicts:
+        return
+    print()
+    print("!" * WIDTH)
+    print("  PROFILE CONFLICT WARNINGS".ljust(WIDTH))
+    print("!" * WIDTH)
+    print("  These preferences are hard to satisfy with the current catalog.")
+    print("  Recommendations are still shown below, but may be partial matches.")
+    for conflict in conflicts:
+        print(f"    - {conflict.message}")
+    print("!" * WIDTH)
+
+
 def main() -> None:
-    songs = load_songs("data/songs.csv")
+    # The whole workflow is guarded: any bad input (dataset or profile) is
+    # reported as a clear message and stops the run before scoring happens,
+    # instead of surfacing a raw traceback.
+    try:
+        songs = load_songs("data/songs.csv")
+        validate_dataset(songs)                      # dataset must be usable
 
-    # Starter example profile
-    user_prefs = {"genre": "pop", "mood": "happy", "energy": 0.8}
+        # Starter example profile
+        user_prefs = {"genre": "pop", "mood": "happy", "energy": 0.8}
+        k = 5
 
-    recommendations = recommend_songs(user_prefs, songs, k=5)
-    print_recommendations(user_prefs, recommendations)
+        user_prefs = validate_user_prefs(user_prefs)  # profile must be well-formed
+        k = validate_top_k(k)                          # top-k must be valid
+
+        # Warn (but don't stop) when the profile is hard to satisfy in this catalog.
+        conflicts = detect_conflicts(user_prefs, songs)
+        print_conflicts(conflicts)
+
+        recommendations = recommend_songs(user_prefs, songs, k=k)
+        print_recommendations(user_prefs, recommendations)
+    except ValidationError as error:
+        print(f"\n[Input Error] {error}\n")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
