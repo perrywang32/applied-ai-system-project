@@ -13,6 +13,20 @@ Your goal is to:
 
 This project implements a simple music recommendation system that suggests songs based on a user's preferences. Each song is scored using features such as genre, mood, energy, and acousticness, then ranked from highest to lowest score. The project demonstrates how recommendation systems use weighted features to personalize suggestions while also highlighting the limitations and potential biases of rule-based recommenders.
 
+### Advanced feature: Reliability & Testing System
+
+On top of the base recommender, this project adds a reliability layer that checks
+its own results before showing them to the user. Jump to any part:
+
+- [Architecture](#architecture) — how the pieces fit together
+- [Recommendation Confidence](#recommendation-confidence) — a 0–1 trust score with a High/Medium/Low label
+- [Fallback for weak matches](#fallback-for-weak-matches) — honest handling when no strong match exists
+- [Evaluation Metrics](#evaluation-metrics) — deterministic quality measurements
+- Input & dataset **validation**, profile **conflict detection**, and **logging** to `logs/recommender.log`
+
+The scoring/ranking engine is unchanged; the reliability layer wraps it. See
+[Running Tests](#running-tests) to run the 98-test suite and the evaluation harness.
+
 ---
 
 ## How The System Works
@@ -36,7 +50,7 @@ Algorithm Recipe
 * Load every song from songs.csv.
 * Compare the song's genre with the user's favorite genre.
 * Compare the song's mood with the user's favorite mood.
-* Award points based on how close the song's energy is to     the user's target energy.
+* Award points based on how close the song's energy is to the user's target energy.
 * Award points based on whether the song matches the user's acousticness preference.
 * Add the points together to calculate the song's total score.
 * Repeat for every song.
@@ -46,6 +60,7 @@ Algorithm Recipe
 Potential Biases
 
 This recommender may over-prioritize genre, causing songs from other genres that closely match the user's mood or energy to receive lower scores. It also depends on manually chosen weights, which may not reflect every user's listening habits. Real recommendation systems reduce these biases by learning from large amounts of user behavior and continuously adjusting their models.
+
 ---
 
 ## Architecture
@@ -165,20 +180,34 @@ python -m src.main
 
 ### Running Tests
 
-Run the starter tests with:
+Run the full suite (98 tests covering the recommender plus every reliability
+layer — validation, conflicts, confidence, fallback, logging, evaluation, and an
+end-to-end integration path):
 
 ```bash
 pytest
 ```
 
-You can add more tests in `tests/test_recommender.py`.
+Tests live in `tests/` (`test_recommender`, `test_validation`, `test_conflicts`,
+`test_confidence`, `test_fallback`, `test_logging`, `test_evaluation`,
+`test_harness`, `test_integration`).
+
+### Running the Evaluation & Harness
+
+Both are deterministic and print to the terminal — no web interface required:
+
+```bash
+python -m experiments.run_evaluation   # quality metrics -> experiments/evaluation_results.md
+python -m experiments.run_harness      # 6-case end-to-end harness -> experiments/harness_report.txt
+```
 
 ---
 
 ## Sample Recommendation Output
 
 Running `python -m src.main` with the profile `genre=pop, mood=happy, energy=0.8`
-against the 24-song catalog produces:
+against the 24-song catalog produces the ranked list followed by the confidence
+summary (abridged here to the first and last entries):
 
 ```
 Loaded 24 songs from data/songs.csv
@@ -233,7 +262,20 @@ For profile -> genre: pop  |  mood: happy  |  energy: 0.8
         - Mood 'uplifting' is not your favorite 'happy' (+0.0)
         - Energy 0.78 vs target 0.80 (+1.96)
 ------------------------------------------------------------
+
+============================================================
+  Confidence: 0.94 - High
+
+  Reason:
+    - Genre matched
+    - Mood matched
+    - Energy difference was 0.02
+============================================================
 ```
+
+This is a strong match, so no conflict warnings or fallback appear. See
+[Recommendation Confidence](#recommendation-confidence) and
+[Fallback for weak matches](#fallback-for-weak-matches) for the low-confidence case.
 
 **Screenshot or video** *(optional)*: <!-- Insert a screenshot or demo video link here -->
 
