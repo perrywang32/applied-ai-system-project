@@ -90,49 +90,60 @@ def _get_energy(prefs: Dict):
     return energy if energy is not None else prefs.get("energy")
 
 
-def _explain_top(prefs: Dict, song: Dict) -> Tuple[int, int, List[str]]:
+def _preference_checks(prefs: Dict, song: Dict) -> List[Tuple[str, bool, str]]:
     """
-    Check each stated preference against the top song.
+    Evaluate each stated preference against a song.
 
-    Returns (satisfied_count, requested_count, reasons) where `reasons` is a
-    plain-English line per preference, e.g. "Genre matched" or
-    "Energy difference was 0.12".
+    Returns one (name, satisfied, reason) tuple per stated preference, e.g.
+    ("Genre", True, "Genre matched") or ("Energy", False, "Energy difference was 0.55").
+    This is the single source of truth for "what counts as a match", reused by
+    confidence scoring and by the fallback breakdown.
     """
     genre, mood = _get_genre(prefs), _get_mood(prefs)
     energy, likes_acoustic = _get_energy(prefs), prefs.get("likes_acoustic")
 
-    satisfied = 0
-    requested = 0
-    reasons: List[str] = []
+    checks: List[Tuple[str, bool, str]] = []
 
     if genre:
-        requested += 1
         ok = _same(song.get("genre", ""), genre)
-        satisfied += int(ok)
-        reasons.append("Genre matched" if ok else "Genre did not match")
+        checks.append(("Genre", ok, "Genre matched" if ok else "Genre did not match"))
 
     if mood:
-        requested += 1
         ok = _same(song.get("mood", ""), mood)
-        satisfied += int(ok)
-        reasons.append("Mood matched" if ok else "Mood did not match")
+        checks.append(("Mood", ok, "Mood matched" if ok else "Mood did not match"))
 
     if energy is not None:
-        requested += 1
         difference = abs(song["energy"] - energy)
-        satisfied += int(difference <= ENERGY_NEAR)
-        reasons.append(f"Energy difference was {difference:.2f}")
+        ok = difference <= ENERGY_NEAR
+        checks.append(("Energy", ok, f"Energy difference was {difference:.2f}"))
 
     if isinstance(likes_acoustic, bool):
-        requested += 1
         if likes_acoustic:
             ok = song["acousticness"] >= ACOUSTIC_CUTOFF
         else:
             ok = song["acousticness"] <= ACOUSTIC_CUTOFF
-        satisfied += int(ok)
-        reasons.append("Acoustic preference matched" if ok else "Acoustic preference did not match")
+        checks.append((
+            "Acoustic preference", ok,
+            "Acoustic preference matched" if ok else "Acoustic preference did not match",
+        ))
 
-    return satisfied, requested, reasons
+    return checks
+
+
+def _explain_top(prefs: Dict, song: Dict) -> Tuple[int, int, List[str]]:
+    """Return (satisfied_count, requested_count, reasons) for a single song."""
+    checks = _preference_checks(prefs, song)
+    satisfied = sum(1 for _, ok, _ in checks if ok)
+    reasons = [reason for _, _, reason in checks]
+    return satisfied, len(checks), reasons
+
+
+def preference_breakdown(prefs: Dict, song: Dict) -> Tuple[List[str], List[str]]:
+    """Return (matched, unmatched) plain-English preference labels for a song."""
+    checks = _preference_checks(prefs, song)
+    matched = [reason for _, ok, reason in checks if ok]
+    unmatched = [reason for _, ok, reason in checks if not ok]
+    return matched, unmatched
 
 
 # --- Public API ------------------------------------------------------------

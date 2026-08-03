@@ -199,6 +199,36 @@ Here genre and mood matched and the energy was close (difference 0.12), but the
 acoustic preference was missed, so the top song is a *fallback* rather than an
 exact match — which pulls confidence down into the Medium band.
 
+### Fallback for weak matches
+
+When confidence falls into the **Low** band (below the `0.50` threshold), the
+top result is not a strong, complete match. Instead of presenting a weak match
+as if it were perfect, the app adds a **"NO STRONG MATCH FOUND"** section that:
+
+- states plainly that no strong complete match was found,
+- lists the **closest available alternatives** (the top of the normal ranking),
+- explains, per alternative, which preferences **matched** and which **did not**.
+
+The normal ranked recommendations are still shown — fallback only adds an honest
+framing on top of them, and never returns an empty result when alternatives
+exist. Example (adversarial `metal / chill / 0.10 / acoustic` profile):
+
+```
+************************************************************
+  NO STRONG MATCH FOUND
+************************************************************
+  No strong complete match was found for your preferences. Showing the
+  closest available alternatives instead.
+  (confidence 0.29 is below the 0.50 threshold)
+
+  Closest available alternatives:
+    1. Spacewalk Thoughts - Orbit Bloom (score 4.56)
+       Matched: Mood matched, Acoustic preference matched
+       Did not match: Genre did not match, Energy difference was 0.18
+    ...
+************************************************************
+```
+
 ---
 
 ## Multi-Profile Testing
