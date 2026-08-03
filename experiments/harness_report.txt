@@ -1,0 +1,138 @@
+MUSIC RECOMMENDER - END-TO-END TEST HARNESS
+
+================================================================
+CASE 1: Normal strong match
+================================================================
+Input profile: genre=edm, mood=energetic, target_energy=0.95, likes_acoustic=False
+Criteria: confidence label is High and fallback is NOT used
+
+Top recommendations:
+  1. Neon Warehouse - Pulse Divide (score 7.98)
+  2. Skyline Anthem - Martin Garrix (score 7.90)
+  3. Detonate - ISOKNOCK (score 5.96)
+  4. Wreckage - Crankdat (score 5.95)
+  5. Afterglow Skies - Illenium (score 5.38)
+Top match preferences:
+  Matched: Genre matched, Mood matched, Energy difference was 0.00, Acoustic preference matched
+  Did not match: (none)
+Confidence: 0.81 (High)
+Warnings:
+  (none)
+Fallback used: no
+Evaluation metrics: genre=1.0 mood=0.4 energy_err=0.046 acoustic=1.0 attrs=0.8
+Result: PASS
+
+================================================================
+CASE 2: Partial match
+================================================================
+Input profile: genre=pop, mood=happy, target_energy=0.7, likes_acoustic=True
+Criteria: confidence label is Medium and fallback is NOT used
+
+Top recommendations:
+  1. Sunrise City - Neon Echo (score 6.94)
+  2. Gym Hero - Max Pulse (score 4.59)
+  3. Rooftop Lights - Indigo Parade (score 4.23)
+  4. Dust and Highway - Clay Harmon (score 2.32)
+  5. Coffee Shop Stories - Slow Stereo (score 2.23)
+Top match preferences:
+  Matched: Genre matched, Mood matched, Energy difference was 0.12
+  Did not match: Acoustic preference did not match
+Confidence: 0.55 (Medium)
+Warnings:
+  - [acoustic_unavailable] You prefer acoustic songs, but no 'pop' song in the catalog is acoustic.
+  - [no_single_song_satisfies_all] No single song matches all of your preferences at once; your recommendations will be partial matches.
+Fallback used: no
+Evaluation metrics: genre=0.4 mood=0.4 energy_err=0.184 acoustic=0.4 attrs=0.4
+Result: PASS
+
+================================================================
+CASE 3: Conflicting / difficult
+================================================================
+Input profile: genre=metal, mood=chill, target_energy=0.1, likes_acoustic=True
+Criteria: at least one conflict is detected and confidence label is Low
+
+Top recommendations:
+  1. Spacewalk Thoughts - Orbit Bloom (score 4.56)
+  2. Library Rain - Paper Lanterns (score 4.36)
+  3. Midnight Coding - LoRoom (score 4.07)
+  4. Iron Verdict - Ashfall (score 3.25)
+  5. Chamber of Rain - The Chamber Set (score 2.67)
+Top match preferences:
+  Matched: Mood matched, Acoustic preference matched
+  Did not match: Genre did not match, Energy difference was 0.18
+Confidence: 0.29 (Low)
+Warnings:
+  - [genre_energy_mismatch] Your genre 'metal' has no song near your target energy 0.10 (the closest is 0.98 in 'Iron Verdict').
+  - [genre_mood_absent] No 'metal' song has a 'chill' mood in the catalog.
+  - [acoustic_unavailable] You prefer acoustic songs, but no 'metal' song in the catalog is acoustic.
+  - [no_single_song_satisfies_all] No single song matches all of your preferences at once; your recommendations will be partial matches.
+  - [low_confidence] recommendations may not match you well
+Fallback used: yes
+Evaluation metrics: genre=0.2 mood=0.6 energy_err=0.356 acoustic=0.8 attrs=0.45
+Result: PASS
+
+================================================================
+CASE 4: Invalid input (energy out of range)
+================================================================
+Input profile: genre=pop, mood=happy, energy=1.5
+Criteria: input is rejected by validation with a clear error
+Validation: REJECTED - Preference 'energy' must be between 0.0 and 1.0; got 1.5.
+Result: PASS
+
+================================================================
+CASE 5: Fallback trigger
+================================================================
+Input profile: genre=jazz, mood=energetic, target_energy=0.95, likes_acoustic=False
+Criteria: fallback IS activated
+
+Top recommendations:
+  1. Neon Warehouse - Pulse Divide (score 4.98)
+  2. Skyline Anthem - Martin Garrix (score 4.90)
+  3. Coffee Shop Stories - Slow Stereo (score 3.95)
+  4. Detonate - ISOKNOCK (score 2.96)
+  5. Wreckage - Crankdat (score 2.95)
+Top match preferences:
+  Matched: Mood matched, Energy difference was 0.00, Acoustic preference matched
+  Did not match: Genre did not match
+Confidence: 0.35 (Low)
+Warnings:
+  - [genre_energy_mismatch] Your genre 'jazz' has no song near your target energy 0.95 (the closest is 0.37 in 'Coffee Shop Stories').
+  - [genre_mood_absent] No 'jazz' song has a 'energetic' mood in the catalog.
+  - [acoustic_unavailable] You prefer non-acoustic songs, but every 'jazz' song in the catalog is acoustic.
+  - [no_single_song_satisfies_all] No single song matches all of your preferences at once; your recommendations will be partial matches.
+  - [low_confidence] recommendations may not match you well
+Fallback used: yes
+Evaluation metrics: genre=0.2 mood=0.4 energy_err=0.128 acoustic=0.8 attrs=0.55
+Result: PASS
+
+================================================================
+CASE 6: Boundary energy value (1.0)
+================================================================
+Input profile: genre=edm, mood=energetic, target_energy=1.0, likes_acoustic=False
+Criteria: boundary value is accepted and recommendations are returned
+
+Top recommendations:
+  1. Neon Warehouse - Pulse Divide (score 7.88)
+  2. Skyline Anthem - Martin Garrix (score 7.80)
+  3. Wreckage - Crankdat (score 5.93)
+  4. Detonate - ISOKNOCK (score 5.90)
+  5. Afterglow Skies - Illenium (score 5.28)
+Top match preferences:
+  Matched: Genre matched, Mood matched, Energy difference was 0.05, Acoustic preference matched
+  Did not match: (none)
+Confidence: 0.80 (High)
+Warnings:
+  (none)
+Fallback used: no
+Evaluation metrics: genre=1.0 mood=0.4 energy_err=0.084 acoustic=1.0 attrs=0.8
+Result: PASS
+
+================================================================
+SUMMARY
+================================================================
+Total cases:        6
+Passed:             6
+Failed:             0
+Average confidence: 0.56  (over 5 valid cases)
+Fallback cases:     2
+================================================================

@@ -231,6 +231,39 @@ exist. Example (adversarial `metal / chill / 0.10 / acoustic` profile):
 
 ---
 
+## Evaluation Metrics
+
+The recommender is evaluated with simple, **deterministic** metrics computed from
+the *real* pipeline output (not a hand-picked example). Run:
+
+```bash
+python -m experiments.run_evaluation
+```
+
+This scores four diverse profiles and saves a full report to
+[experiments/evaluation_results.md](experiments/evaluation_results.md). Captured
+aggregate output:
+
+```
+Evaluated 4 profiles against the catalog:
+  Genre match rate:            0.50
+  Mood match rate:             0.60
+  Average energy error:        0.12
+  Acoustic match rate:         0.95
+  Attributes satisfied:        0.70
+  Low-confidence cases:        1/4
+  Fallback activation rate:    0.25
+```
+
+The metrics tell a consistent story: acoustic and energy targets are met very
+closely (acoustic match 0.95, energy error 0.12), while **genre match rate is
+only 0.50** — a direct measurement of the small-catalog limitation, since
+single-song genres (rock, metal) cannot fill a top-5 with same-genre tracks. The
+one internally-contradictory profile is the only low-confidence, fallback case
+(1 of 4), exactly as intended.
+
+---
+
 ## Multi-Profile Testing
 
 To stress-test the scorer beyond the single starter profile, I ran it against
