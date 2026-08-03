@@ -148,6 +148,59 @@ For profile -> genre: pop  |  mood: happy  |  energy: 0.8
 
 ---
 
+## Recommendation Confidence
+
+Every run reports a **confidence** value between **0 and 1** with a label of
+**High**, **Medium**, or **Low**. Confidence answers a different question than the
+raw score: the score says *how well the top song matched*, while confidence says
+*how much you should trust the result*. We deliberately do **not** reuse the raw
+score as confidence — a song can score highly while barely beating the runner-up
+or satisfying only some of your preferences.
+
+Confidence is built from evidence we already have, each scaled to 0–1:
+
+| Piece | Meaning | How it's computed |
+|---|---|---|
+| **Match quality** | How good the top match is | `top_score / 8.0` (8.0 is the max possible score) |
+| **Separation** | How clearly #1 beats #2 | `min(1, (score1 − score2) / 2.0)` (a 2-point lead = full) |
+| **Coverage** | How many stated preferences the top song meets | `satisfied / requested` |
+
+These are combined with fixed weights, then reduced by penalties:
+
+```
+base       = 0.50 * match_quality + 0.20 * separation + 0.30 * coverage
+confidence = base
+             * 0.85   if the top song is a FALLBACK match (not all prefs met)
+             * 0.75   if a profile CONFLICT was detected
+
+label:  confidence >= 0.80 -> High     (near-perfect match)
+        confidence >= 0.50 -> Medium   (a preference or two missed)
+        otherwise          -> Low
+```
+
+Because every input is fixed data, the same profile and catalog always produce
+the **same** confidence (it is deterministic). The app prints the confidence
+value, its label, and a plain-English reason per preference. When confidence is
+**Low**, it also prints a warning suggesting you broaden your preferences.
+
+A reasonable partial-match result looks like this:
+
+```
+Confidence: 0.74 - Medium
+
+Reason:
+  - Genre matched
+  - Mood matched
+  - Energy difference was 0.12
+  - Acoustic preference did not match
+```
+
+Here genre and mood matched and the energy was close (difference 0.12), but the
+acoustic preference was missed, so the top song is a *fallback* rather than an
+exact match — which pulls confidence down into the Medium band.
+
+---
+
 ## Multi-Profile Testing
 
 To stress-test the scorer beyond the single starter profile, I ran it against

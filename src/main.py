@@ -11,6 +11,7 @@ You will implement the functions in recommender.py:
 
 import sys
 
+from src.confidence import score_confidence
 from src.conflicts import detect_conflicts
 from src.recommender import load_songs, recommend_songs
 from src.validation import (
@@ -67,6 +68,26 @@ def print_conflicts(conflicts: list) -> None:
     print("!" * WIDTH)
 
 
+def print_confidence(confidence) -> None:
+    """Show the confidence score, its per-preference reasons, and a Low warning.
+
+    Uses a plain '-' rather than an em dash so the line renders cleanly on the
+    Windows console.
+    """
+    print()
+    print("=" * WIDTH)
+    print(f"  Confidence: {confidence.value:.2f} - {confidence.label}")
+    print()
+    print("  Reason:")
+    for reason in confidence.reasons:
+        print(f"    - {reason}")
+    if confidence.label == "Low":
+        print()
+        print("  [Low confidence] These recommendations may not match you well.")
+        print("  Try broadening your preferences or review the warnings above.")
+    print("=" * WIDTH)
+
+
 def main() -> None:
     # The whole workflow is guarded: any bad input (dataset or profile) is
     # reported as a clear message and stops the run before scoring happens,
@@ -87,7 +108,13 @@ def main() -> None:
         print_conflicts(conflicts)
 
         recommendations = recommend_songs(user_prefs, songs, k=k)
+
+        # Confidence combines match quality, separation, coverage, and penalties
+        # for conflicts / fallback matches (see src/confidence.py).
+        confidence = score_confidence(user_prefs, recommendations, conflicts)
+
         print_recommendations(user_prefs, recommendations)
+        print_confidence(confidence)
     except ValidationError as error:
         print(f"\n[Input Error] {error}\n")
         sys.exit(1)
