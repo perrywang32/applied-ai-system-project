@@ -1,28 +1,71 @@
-%% Architecture — Music Recommender + Reliability / Testing System
-%% Starter diagram. This is a placeholder to be filled in as the reliability
-%% layer is built (see IMPLEMENTATION_PLAN.md). Nodes marked "(planned)" do not
-%% exist in code yet — the current foundation is only load_songs -> score_song
-%% -> recommend_songs. Do not treat this as the finished architecture.
-
+%% Music Recommender - Reliability / Testing System
+%% Data flow: input -> validation -> scoring -> reliability checks -> output,
+%% with logging as a cross-cutting concern and tests/human review verifying results.
 flowchart TD
-    user["User preferences (user_prefs)"]
-    inval["Input validation (planned)"]
-    csv["data/songs.csv"]
-    load["load_songs()"]
-    dsval["Dataset validation (planned)"]
-    score["score_song()"]
-    rank["recommend_songs()"]
-    conf["Confidence scoring (planned)"]
-    conflict["Conflict detection (planned)"]
-    fallback["Fallback for low confidence (planned)"]
-    out["Ranked recommendations + reasons"]
-    log["Logging & error handling (planned, cross-cutting)"]
+    %% ---------- Inputs ----------
+    U["User input<br/>(taste profile)"]
+    CSV[("Song dataset<br/>data/songs.csv")]
 
-    user --> inval --> rank
-    csv --> load --> dsval --> score --> rank
-    rank --> conf --> conflict --> fallback --> out
-    log -.-> inval
-    log -.-> dsval
-    log -.-> conf
-    log -.-> conflict
-    log -.-> fallback
+    %% ---------- Validation ----------
+    PV["Profile validation<br/>validate_user_prefs / validate_top_k"]
+    DV["Dataset validation<br/>load_songs + validate_dataset"]
+
+    %% ---------- Analysis + core engine ----------
+    CD["Conflict detection<br/>detect_conflicts"]
+    ENG["Scoring and ranking engine<br/>score_song / recommend_songs"]
+    RANK["Ranked recommendations"]
+
+    %% ---------- Reliability layer ----------
+    CONF["Confidence calculation<br/>score_confidence"]
+    FB["Fallback behavior<br/>build_fallback"]
+
+    %% ---------- Output ----------
+    OUT["User-visible output<br/>recommendations + reasons + confidence + warnings"]
+
+    %% ---------- Cross-cutting + quality ----------
+    LOG[["Logging<br/>logs/recommender.log"]]
+    EVAL["Evaluator / test harness<br/>evaluation.py + run_harness.py"]
+    TESTS{{"Automated tests<br/>pytest"}}
+    HUMAN{{"Human review<br/>README / model_card.md"}}
+
+    %% ----- Main flow: input -> process -> output -----
+    U --> PV
+    CSV --> DV
+    PV --> ENG
+    DV --> ENG
+    PV --> CD
+    DV --> CD
+    ENG --> RANK
+    RANK --> CONF
+    CD --> CONF
+    CONF --> FB
+    RANK --> FB
+    FB --> OUT
+    RANK -. ranked list shown .-> OUT
+    CONF -. confidence shown .-> OUT
+    CD -. conflict warnings .-> OUT
+
+    %% ----- Verification: automated tests + human review -----
+    RANK --> EVAL
+    FB --> EVAL
+    EVAL --> TESTS
+    OUT --> TESTS
+    TESTS --> HUMAN
+
+    %% ----- Logging observes the key stages -----
+    PV -. logs .-> LOG
+    DV -. logs .-> LOG
+    CD -. logs .-> LOG
+    CONF -. logs .-> LOG
+    FB -. logs .-> LOG
+
+    %% ---------- Styling ----------
+    classDef input fill:#e3f2fd,stroke:#1565c0,color:#0d1b2a;
+    classDef reliability fill:#fff3e0,stroke:#e65100,color:#0d1b2a;
+    classDef quality fill:#e8f5e9,stroke:#2e7d32,color:#0d1b2a;
+    classDef cross fill:#f3e5f5,stroke:#6a1b9a,color:#0d1b2a;
+
+    class U,CSV input;
+    class CONF,FB reliability;
+    class EVAL,TESTS,HUMAN quality;
+    class LOG cross;

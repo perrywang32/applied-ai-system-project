@@ -48,6 +48,97 @@ Potential Biases
 This recommender may over-prioritize genre, causing songs from other genres that closely match the user's mood or energy to receive lower scores. It also depends on manually chosen weights, which may not reflect every user's listening habits. Real recommendation systems reduce these biases by learning from large amounts of user behavior and continuously adjusting their models.
 ---
 
+## Architecture
+
+The system follows a clear **input → process → output** flow, with a reliability
+layer that checks the result before it reaches the user, logging as a
+cross-cutting concern, and automated tests plus human review verifying quality.
+The Mermaid source lives in [diagrams/architecture.mmd](diagrams/architecture.mmd).
+
+```mermaid
+flowchart TD
+    U["User input<br/>(taste profile)"]
+    CSV[("Song dataset<br/>data/songs.csv")]
+
+    PV["Profile validation<br/>validate_user_prefs / validate_top_k"]
+    DV["Dataset validation<br/>load_songs + validate_dataset"]
+
+    CD["Conflict detection<br/>detect_conflicts"]
+    ENG["Scoring and ranking engine<br/>score_song / recommend_songs"]
+    RANK["Ranked recommendations"]
+
+    CONF["Confidence calculation<br/>score_confidence"]
+    FB["Fallback behavior<br/>build_fallback"]
+
+    OUT["User-visible output<br/>recommendations + reasons + confidence + warnings"]
+
+    LOG[["Logging<br/>logs/recommender.log"]]
+    EVAL["Evaluator / test harness<br/>evaluation.py + run_harness.py"]
+    TESTS{{"Automated tests<br/>pytest"}}
+    HUMAN{{"Human review<br/>README / model_card.md"}}
+
+    U --> PV
+    CSV --> DV
+    PV --> ENG
+    DV --> ENG
+    PV --> CD
+    DV --> CD
+    ENG --> RANK
+    RANK --> CONF
+    CD --> CONF
+    CONF --> FB
+    RANK --> FB
+    FB --> OUT
+    RANK -. ranked list shown .-> OUT
+    CONF -. confidence shown .-> OUT
+    CD -. conflict warnings .-> OUT
+
+    RANK --> EVAL
+    FB --> EVAL
+    EVAL --> TESTS
+    OUT --> TESTS
+    TESTS --> HUMAN
+
+    PV -. logs .-> LOG
+    DV -. logs .-> LOG
+    CD -. logs .-> LOG
+    CONF -. logs .-> LOG
+    FB -. logs .-> LOG
+```
+
+### Component overview
+
+- **User input** — a taste profile (genre, mood, target energy, acoustic preference)
+  supplied as a dict in `main.py`.
+- **Song dataset** — `data/songs.csv`, the catalog of songs with their features.
+- **Profile validation** (`validate_user_prefs`, `validate_top_k`) — rejects missing
+  fields, blank values, invalid/out-of-range energy, and bad top-k *before* scoring.
+- **Dataset validation** (`load_songs`, `validate_dataset`) — checks columns exist,
+  numbers parse, values are in range, and the catalog isn't empty.
+- **Conflict detection** (`detect_conflicts`) — inspects the real catalog for
+  preference combinations it can't satisfy (e.g. a genre with no song near the
+  target energy); produces warnings, never blocks the run.
+- **Scoring and ranking engine** (`score_song`, `recommend_songs`) — the original
+  recommender: scores every song by weighted feature matches and ranks them.
+- **Ranked recommendations** — the top-k list with per-song reasons.
+- **Confidence calculation** (`score_confidence`) — combines match quality,
+  #1–#2 separation, coverage, and penalties for conflicts/fallback into a 0–1
+  value with a High/Medium/Low label.
+- **Fallback behavior** (`build_fallback`) — when confidence is Low, reframes the
+  output as "closest alternatives" with matched/unmatched preferences instead of
+  presenting a weak match as perfect. The normal ranked list is preserved.
+- **User-visible output** — `main.py`'s `print_*` helpers: recommendations,
+  reasons, confidence, conflict warnings, and any fallback notice.
+- **Logging** (`logging_config`) — a cross-cutting concern writing timestamped
+  technical events to `logs/recommender.log` while the console stays clean.
+- **Evaluator / test harness** (`evaluation.py`, `experiments/run_harness.py`) —
+  deterministic quality metrics and an end-to-end harness over predefined profiles.
+- **Automated tests** (`pytest`) and **Human review** (README, `model_card.md`) —
+  where results are checked: machine-verified behavior plus human judgment about
+  fairness, bias, and limitations.
+
+---
+
 ## Getting Started
 
 ### Setup
