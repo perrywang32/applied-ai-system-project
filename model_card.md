@@ -34,6 +34,13 @@ Avoid code here. Pretend you are explaining the idea to a friend who does not pr
 
 The recommender compares each song in the dataset with the user's preferences. It awards points when the genre and mood match, gives additional points when the song's energy level is close to the user's target energy, and considers whether the user prefers acoustic or non-acoustic music. After every song receives a score, the songs are ranked from highest to lowest, and the top recommendations are returned.
 
+**Reliability layer (added on top of the scorer).** Beyond the core scoring, I added a layer that checks the system's own output before showing it to the user. It does four things, and none of them change the scoring math:
+
+- **Validation** rejects malformed input before scoring — a missing field, a blank genre, or an out-of-range energy is caught with a clear message rather than producing a garbage ranking. Dataset validation does the same for the song catalog.
+- **Conflict detection** inspects the *actual* catalog and warns when a request can't really be satisfied — for example, a favorite genre that has no song near the requested energy. It only warns; it never blocks the run.
+- **Confidence scoring** turns "here are 5 songs" into "here are 5 songs, and here's how much to trust them." It produces a 0–1 value with a High/Medium/Low label by combining how good the top match is, how clearly it beats the runner-up, and how many stated preferences it satisfies, with penalties for conflicts and fallback matches.
+- **Fallback** kicks in when confidence is Low: instead of presenting a weak match as if it were perfect, the app says "no strong complete match was found" and lists the closest alternatives with the preferences each one matched and missed. The normal ranked list is still shown.
+
 ## 4. Data  
 
 Describe the dataset the model uses.  
@@ -72,6 +79,8 @@ Prompts:
 
 The clearest weakness I found is that genre and mood are scored on an *exact* string match, with no partial credit for closely related categories. During testing this meant a song labeled "indie pop" scored zero against a "pop" preference, and an "energetic" song scored zero against an "intense" preference, even though a listener would consider those nearly the same. This creates an unfair coverage gap: because 14 of the 17 genres in my dataset appear only once, a user whose favorite genre is a singleton (like folk or metal) can receive at most one true genre match, and the rest of their top-5 is filled by unrelated songs that merely happened to match on energy. In effect, users with mainstream-in-this-dataset tastes (EDM, high energy) get coherent recommendations, while users with underrepresented tastes get filler. The root cause is a scoring "cliff" — a near-miss category is treated identically to a completely unrelated one.
 
+The reliability layer changes how these weaknesses are *handled*, not whether they exist. It now makes them visible instead of silent: my adversarial metal + chill + acoustic profile triggers conflict warnings, a Low confidence score (0.29), and fallback, so the user is told the request is hard to satisfy rather than being handed filler that looks authoritative. But it cannot fix the underlying causes — the exact-match cliff and the tiny, uneven catalog are still there. A folk or metal listener still receives one real genre match plus alternatives; confidence and fallback simply make that limitation honest and explicit rather than hiding it behind a confident-looking top-5.
+
 ---
 
 ## 7. Evaluation  
@@ -86,6 +95,20 @@ Prompts:
 - Any simple tests or comparisons you ran  
 
 No need for numeric metrics unless you created some.
+
+**Automated evaluation metrics (deterministic).** I added an evaluation module that measures quality from the *real* pipeline output across four profiles (`python -m experiments.run_evaluation`). The aggregate results:
+
+| Metric | Value |
+|---|---|
+| Genre match rate | 0.50 |
+| Mood match rate | 0.60 |
+| Average energy error | 0.12 |
+| Acoustic match rate | 0.95 |
+| Attributes satisfied | 0.70 |
+| Low-confidence cases | 1 of 4 |
+| Fallback activation rate | 0.25 |
+
+These numbers put a measurement behind the qualitative findings below. Acoustic and energy targets are met closely (acoustic 0.95, energy error 0.12), but the **genre match rate of only 0.50** is a direct measurement of the small-catalog coverage gap — single-song genres simply cannot fill a top-5 with same-genre tracks. The one internally-contradictory profile is the only low-confidence, fallback case (1 of 4), exactly as designed. I also built an end-to-end harness (`python -m experiments.run_harness`) that runs six scenarios — normal, partial, conflicting, invalid input, fallback, and a boundary energy value — and all six pass their defined criteria (average confidence 0.56 across the valid cases). The whole system is covered by 98 automated pytest tests.
 
 **Weight-shift experiment.** To see how sensitive the rankings were to my chosen weights, I ran a controlled experiment: I halved the genre weight (from +3.0 to +1.5) and doubled the energy weight (from a maximum of +2.0 to +4.0), while leaving mood (+2.0) and acousticness (up to +1.0) unchanged. I then reran the default profile (`genre=pop, mood=happy, energy=0.8`) and compared the top-5 against the original weights. The #1 pick, "Sunrise City," held its place and its score actually rose (6.96 → 7.42) because its near-perfect energy match now counted double. The most revealing change was a ranking flip at #2/#3: "Rooftop Lights" (indie pop, happy, energy 0.76) rose above "Gym Hero" (pop, intense, energy 0.93) — meaning a song that matched the *mood* and energy but missed the genre now outranked a song that matched the *genre* but missed the mood. This confirmed that my results are highly sensitive to weight choices, and that the weights encode a value judgment about whether genre loyalty or mood/energy "vibe" matters more. The trade-off was clear: emphasizing energy improved vibe-matching but weakened genre coherence, letting off-genre songs (like a funk track at exactly the target energy) climb into a "pop" list.
 
